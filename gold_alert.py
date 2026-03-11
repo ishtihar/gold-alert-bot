@@ -3,7 +3,7 @@ import re
 from bs4 import BeautifulSoup
 
 BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
-CHAT_ID = "649507132"
+CHAT_ID = "5508496123"
 
 URL = "https://stooq.com/q/l/?s=xauusd"
 
