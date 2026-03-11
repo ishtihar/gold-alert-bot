@@ -10,29 +10,26 @@ PRICE_FILE = "last_price.json"
 
 def get_gold_price():
 
-    gold_url = "https://api.goldapi.io/api/XAU/USD"
-    headers = {"x-access-token": "goldapi-demo"}
-
-    r = requests.get(gold_url, headers=headers)
-    data = r.json()
-
-    usd_ounce = data["price"]
+    # Gold price USD per ounce
+    gold = requests.get("https://api.metals.live/v1/spot/gold").json()
+    usd_ounce = gold[0]["price"]
 
     # USDINR
     fx = requests.get("https://open.er-api.com/v6/latest/USD").json()
     usdinr = fx["rates"]["INR"]
 
-    # convert
+    # convert to INR
     inr_ounce = usd_ounce * usdinr
-    gram_24k = inr_ounce / 31.1035
 
-    # GST + import adjustment
-    gram_24k = gram_24k * 1.10
+    gram_price = inr_ounce / 31.1035
 
-    price_10g = gram_24k * 10
-    price_22k = price_10g * 0.916
+    # import duty + GST adjustment
+    gram_price = gram_price * 1.10
 
-    return round(price_10g), round(price_22k), usd_ounce, usdinr
+    price_24k_10g = gram_price * 10
+    price_22k_10g = price_24k_10g * 0.916
+
+    return round(price_24k_10g), round(price_22k_10g), usd_ounce, usdinr
 
 
 def load_last_price():
@@ -61,17 +58,17 @@ def send_message(text):
 
 def main():
 
-    price_24k, price_22k, usd_gold, usdinr = get_gold_price()
+    price24, price22, usd_gold, usdinr = get_gold_price()
 
     last = load_last_price()
 
-    if last is None or last["24k"] != price_24k:
+    if last is None or last["price"] != price24:
 
         message = f"""
 Gold Alert India 🇮🇳
 
-24K: ₹{price_24k} / 10g
-22K: ₹{price_22k} / 10g
+24K: ₹{price24} / 10g
+22K: ₹{price22} / 10g
 
 USD Gold: ${usd_gold}
 USDINR: {usdinr}
@@ -79,9 +76,7 @@ USDINR: {usdinr}
 
         send_message(message)
 
-        save_price({
-            "24k": price_24k
-        })
+        save_price({"price": price24})
 
 
 if __name__ == "__main__":
