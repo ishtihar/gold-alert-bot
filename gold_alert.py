@@ -1,36 +1,59 @@
-import re
 import requests
+import json
+import os
 
 BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
 CHAT_ID = "5508496123"
 
-GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
-FX_URL = "https://open.er-api.com/v6/latest/USD"
-
-IMPORT_DUTY = 5
-GST = 3
-LOCAL_PREMIUM = 250
-CALIBRATION = 0.9828
+PRICE_FILE = "last_price.json"
 
 
 def get_gold_price():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(GOLD_URL, headers=headers)
-    match = re.search(r"\d+\.\d+", r.text)
-    return float(match.group())
+
+    gold_url = "https://api.goldapi.io/api/XAU/USD"
+    headers = {"x-access-token": "goldapi-demo"}
+
+    r = requests.get(gold_url, headers=headers)
+    data = r.json()
+
+    usd_ounce = data["price"]
+
+    # USDINR
+    fx = requests.get("https://open.er-api.com/v6/latest/USD").json()
+    usdinr = fx["rates"]["INR"]
+
+    # convert
+    inr_ounce = usd_ounce * usdinr
+    gram_24k = inr_ounce / 31.1035
+
+    # GST + import adjustment
+    gram_24k = gram_24k * 1.10
+
+    price_10g = gram_24k * 10
+    price_22k = price_10g * 0.916
+
+    return round(price_10g), round(price_22k), usd_ounce, usdinr
 
 
-def get_usdinr():
-    r = requests.get(FX_URL)
-    return r.json()["rates"]["INR"]
+def load_last_price():
+    if os.path.exists(PRICE_FILE):
+        with open(PRICE_FILE) as f:
+            return json.load(f)
+    return None
 
 
-def send_telegram(msg):
+def save_price(price):
+    with open(PRICE_FILE, "w") as f:
+        json.dump(price, f)
+
+
+def send_message(text):
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     payload = {
         "chat_id": CHAT_ID,
-        "text": msg
+        "text": text
     }
 
     requests.post(url, data=payload)
@@ -38,32 +61,27 @@ def send_telegram(msg):
 
 def main():
 
-    usd_gold = get_gold_price()
-    usd_inr = get_usdinr()
+    price_24k, price_22k, usd_gold, usdinr = get_gold_price()
 
-    gram_price = (usd_gold * usd_inr) / 31.103
+    last = load_last_price()
 
-    price_10g = gram_price * 10
+    if last is None or last["24k"] != price_24k:
 
-    price_10g = price_10g * (1 + IMPORT_DUTY / 100)
-    price_10g = price_10g * (1 + GST / 100)
+        message = f"""
+Gold Alert India 🇮🇳
 
-    price_10g = price_10g + LOCAL_PREMIUM
+24K: ₹{price_24k} / 10g
+22K: ₹{price_22k} / 10g
 
-    price_10g = price_10g * CALIBRATION
-
-    price_22k = price_10g * (22 / 24)
-
-    message = f"""Gold Alert India 🇮🇳
-
-24K: ₹{price_10g:,.0f} / 10g
-22K: ₹{price_22k:,.0f} / 10g
-
-USD Gold: ${usd_gold:.2f} / ounce
-USDINR: {usd_inr:.2f}
+USD Gold: ${usd_gold}
+USDINR: {usdinr}
 """
 
-    send_telegram(message)
+        send_message(message)
+
+        save_price({
+            "24k": price_24k
+        })
 
 
 if __name__ == "__main__":
