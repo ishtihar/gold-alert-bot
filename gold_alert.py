@@ -5,7 +5,7 @@ import time
 import requests
 
 BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
-CHAT_ID = "5508496123"
+CHAT_ID = "-1003580840383"
 
 GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
