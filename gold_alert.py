@@ -5,7 +5,7 @@ import time
 import requests
 
 BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
-CHAT_ID = "-1003580840383"
+CHANNEL_CHAT_ID = "-1003580840383"
 
 GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
@@ -23,8 +23,12 @@ SEND_MESSAGE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 def load_state():
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
     return {
         "last_update_id": 0,
         "last_auto_alert_hour": -1
@@ -43,7 +47,7 @@ def get_gold_price():
 
     match = re.search(r"\d+\.\d+", r.text)
     if not match:
-        raise Exception("Gold price not found")
+        raise ValueError("Gold price not found")
 
     return float(match.group())
 
@@ -51,7 +55,12 @@ def get_gold_price():
 def get_usdinr():
     r = requests.get(FX_URL, timeout=20)
     r.raise_for_status()
-    return float(r.json()["rates"]["INR"])
+
+    data = r.json()
+    if "rates" not in data or "INR" not in data["rates"]:
+        raise ValueError("USD/INR not found")
+
+    return float(data["rates"]["INR"])
 
 
 def get_rates():
@@ -76,6 +85,7 @@ def send_telegram(chat_id, msg):
         "chat_id": chat_id,
         "text": msg
     }
+
     r = requests.post(SEND_MESSAGE_URL, data=payload, timeout=20)
     r.raise_for_status()
 
@@ -101,14 +111,20 @@ def handle_commands(state, price_24k, price_22k, usd_gold, usd_inr):
     if not data.get("ok"):
         return state
 
+    latest_price_chat_id = None
+    latest_24k_chat_id = None
+    latest_22k_chat_id = None
+    latest_help_chat_id = None
+
     for item in data.get("result", []):
         update_id = item.get("update_id", 0)
-        message = item.get("message", {})
-        text = message.get("text", "")
-        chat_id = str(message.get("chat", {}).get("id", ""))
 
         if update_id > state.get("last_update_id", 0):
             state["last_update_id"] = update_id
+
+        msg_obj = item.get("message") or item.get("channel_post") or {}
+        text = msg_obj.get("text", "")
+        chat_id = str(msg_obj.get("chat", {}).get("id", ""))
 
         if not text or not chat_id:
             continue
@@ -116,17 +132,26 @@ def handle_commands(state, price_24k, price_22k, usd_gold, usd_inr):
         cmd = text.strip().lower()
 
         if cmd in ["price", "/price"]:
-            reply = build_message("Gold Price", price_24k, price_22k, usd_gold, usd_inr)
-            send_telegram(chat_id, reply)
-
+            latest_price_chat_id = chat_id
         elif cmd == "24k":
-            send_telegram(chat_id, f"24K Gold: ₹{price_24k:,} / 10g")
-
+            latest_24k_chat_id = chat_id
         elif cmd == "22k":
-            send_telegram(chat_id, f"22K Gold: ₹{price_22k:,} / 10g")
-
+            latest_22k_chat_id = chat_id
         elif cmd == "help":
-            send_telegram(chat_id, "Commands:\nprice\n24k\n22k\nhelp")
+            latest_help_chat_id = chat_id
+
+    if latest_price_chat_id:
+        reply = build_message("Gold Price", price_24k, price_22k, usd_gold, usd_inr)
+        send_telegram(latest_price_chat_id, reply)
+
+    if latest_24k_chat_id:
+        send_telegram(latest_24k_chat_id, f"24K Gold: ₹{price_24k:,} / 10g")
+
+    if latest_22k_chat_id:
+        send_telegram(latest_22k_chat_id, f"22K Gold: ₹{price_22k:,} / 10g")
+
+    if latest_help_chat_id:
+        send_telegram(latest_help_chat_id, "Commands:\nprice\n24k\n22k\nhelp")
 
     return state
 
@@ -136,7 +161,7 @@ def handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr):
 
     if current_hour % 2 == 0 and state.get("last_auto_alert_hour") != current_hour:
         msg = build_message("Gold Alert India", price_24k, price_22k, usd_gold, usd_inr)
-        send_telegram(CHAT_ID, msg)
+        send_telegram(CHANNEL_CHAT_ID, msg)
         state["last_auto_alert_hour"] = current_hour
 
     return state
