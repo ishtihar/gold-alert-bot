@@ -4,6 +4,7 @@ import re
 import time
 import requests
 
+# ⚠️ OLD TOKEN (as you said)
 BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
 CHANNEL_CHAT_ID = "-1003580840383"
 
@@ -17,7 +18,6 @@ CALIBRATION = 0.9828
 
 STATE_FILE = "state.json"
 
-GET_UPDATES_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
 SEND_MESSAGE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 
@@ -30,7 +30,6 @@ def load_state():
             pass
 
     return {
-        "last_update_id": 0,
         "last_auto_alert_hour": -1
     }
 
@@ -57,9 +56,6 @@ def get_usdinr():
     r.raise_for_status()
 
     data = r.json()
-    if "rates" not in data or "INR" not in data["rates"]:
-        raise ValueError("USD/INR not found")
-
     return float(data["rates"]["INR"])
 
 
@@ -80,9 +76,9 @@ def get_rates():
     return round(price_10g), round(price_22k), usd_gold, usd_inr
 
 
-def send_telegram(chat_id, msg):
+def send_telegram(msg):
     payload = {
-        "chat_id": chat_id,
+        "chat_id": CHANNEL_CHAT_ID,
         "text": msg
     }
 
@@ -90,8 +86,8 @@ def send_telegram(chat_id, msg):
     r.raise_for_status()
 
 
-def build_message(title, price_24k, price_22k, usd_gold, usd_inr):
-    return f"""{title} 🇮🇳
+def build_message(price_24k, price_22k, usd_gold, usd_inr):
+    return f"""Gold Alert India 🇮🇳
 
 24K: ₹{price_24k:,} / 10g
 22K: ₹{price_22k:,} / 10g
@@ -101,78 +97,26 @@ USDINR: {usd_inr:.2f}
 """
 
 
-def handle_commands(state, price_24k, price_22k, usd_gold, usd_inr):
-    offset = state.get("last_update_id", 0) + 1
-
-    r = requests.get(GET_UPDATES_URL, params={"offset": offset}, timeout=20)
-    r.raise_for_status()
-    data = r.json()
-
-    if not data.get("ok"):
-        return state
-
-    latest_price_chat_id = None
-    latest_24k_chat_id = None
-    latest_22k_chat_id = None
-    latest_help_chat_id = None
-
-    for item in data.get("result", []):
-        update_id = item.get("update_id", 0)
-
-        if update_id > state.get("last_update_id", 0):
-            state["last_update_id"] = update_id
-
-        msg_obj = item.get("message") or item.get("channel_post") or {}
-        text = msg_obj.get("text", "")
-        chat_id = str(msg_obj.get("chat", {}).get("id", ""))
-
-        if not text or not chat_id:
-            continue
-
-        cmd = text.strip().lower()
-
-        if cmd in ["price", "/price"]:
-            latest_price_chat_id = chat_id
-        elif cmd == "24k":
-            latest_24k_chat_id = chat_id
-        elif cmd == "22k":
-            latest_22k_chat_id = chat_id
-        elif cmd == "help":
-            latest_help_chat_id = chat_id
-
-    if latest_price_chat_id:
-        reply = build_message("Gold Price", price_24k, price_22k, usd_gold, usd_inr)
-        send_telegram(latest_price_chat_id, reply)
-
-    if latest_24k_chat_id:
-        send_telegram(latest_24k_chat_id, f"24K Gold: ₹{price_24k:,} / 10g")
-
-    if latest_22k_chat_id:
-        send_telegram(latest_22k_chat_id, f"22K Gold: ₹{price_22k:,} / 10g")
-
-    if latest_help_chat_id:
-        send_telegram(latest_help_chat_id, "Commands:\nprice\n24k\n22k\nhelp")
-
-    return state
-
-
 def handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr):
     current_hour = int(time.time() // 3600)
 
+    # हर 2 घंटे में 1 बार
     if current_hour % 2 == 0 and state.get("last_auto_alert_hour") != current_hour:
-        msg = build_message("Gold Alert India", price_24k, price_22k, usd_gold, usd_inr)
-        send_telegram(CHANNEL_CHAT_ID, msg)
+        msg = build_message(price_24k, price_22k, usd_gold, usd_inr)
+        send_telegram(msg)
         state["last_auto_alert_hour"] = current_hour
 
     return state
 
 
 def main():
+    # 🔥 Important fix (future safety)
+    requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+
     state = load_state()
 
     price_24k, price_22k, usd_gold, usd_inr = get_rates()
 
-    state = handle_commands(state, price_24k, price_22k, usd_gold, usd_inr)
     state = handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr)
 
     save_state(state)
