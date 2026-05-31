@@ -5,7 +5,7 @@ import time
 import requests
 
 # ⚠️ OLD TOKEN (as you said)
-BOT_TOKEN = "8788695706:AAHVdIupcHwvsT-xVmH3mEEgTbpaQg6o0zU"
+BOT_TOKEN = "8681012084:AAFJMsY1cFROKLKADDOvAPNd88cunYhSci8"
 CHANNEL_CHAT_ID = "-1003580840383"
 
 GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
