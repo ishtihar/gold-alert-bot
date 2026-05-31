@@ -83,6 +83,10 @@ def send_telegram(msg):
     }
 
     r = requests.post(SEND_MESSAGE_URL, data=payload, timeout=20)
+
+    print("Status:", r.status_code)
+    print("Response:", r.text)
+
     r.raise_for_status()
 
 
