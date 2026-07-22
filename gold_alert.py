@@ -78,4 +78,25 @@ def get_rates():
 def send_telegram(msg):
     payload = {
         "chat_id": CHANNEL_CHAT_ID,
-  
+        "text": msg
+    }
+    r = requests.post(SEND_MESSAGE_URL, data=payload, timeout=20)
+    print("Status:", r.status_code)
+    print("Response:", r.text)
+    r.raise_for_status()
+
+
+def build_message(price_24k, price_22k, usd_gold, usd_inr):
+    return f"""Gold Alert India 🇮🇳
+
+24K: ₹{price_24k:,} / 10g
+22K: ₹{price_22k:,} / 10g
+USD Gold: ${usd_gold:.2f} / ounce
+USDINR: {usd_inr:.2f}
+"""
+
+
+def handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr):
+    current_hour = int(time.time() // 3600)
+    # हर 2 घंटे में 1 बार
+    if
