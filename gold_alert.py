@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import time
 import requests
 
@@ -8,7 +7,8 @@ import requests
 BOT_TOKEN = "8681012084:AAFJMsY1cFROKLKADDOvAPNd88cunYhSci8"
 CHANNEL_CHAT_ID = "-1003580840383"
 
-GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
+# ✅ New Reliable Free Gold API (No Key Required)
+GOLD_URL = "https://data-asg.goldprice.org/dbXRates/USD"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
 IMPORT_DUTY = 5
@@ -38,13 +38,18 @@ def save_state(state):
 
 
 def get_gold_price():
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     r = requests.get(GOLD_URL, headers=headers, timeout=20)
     r.raise_for_status()
-    match = re.search(r"\d+\.\d+", r.text)
-    if not match:
-        raise ValueError("Gold price not found")
-    return float(match.group())
+    data = r.json()
+    
+    # GoldPrice API से लाइव USD XAU (Gold) प्राइस निकालना
+    if "items" in data and len(data["items"]) > 0:
+        return float(data["items"][0]["xauPrice"])
+    else:
+        raise ValueError("Gold price not found in JSON response")
 
 
 def get_usdinr():
@@ -102,7 +107,7 @@ def handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr):
 
 
 def main():
-    # 🔥 Important fix (future safety)
+    # 🔥 Delete webhook to prevent issues
     requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
     state = load_state()
     price_24k, price_22k, usd_gold, usd_inr = get_rates()
