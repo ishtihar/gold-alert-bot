@@ -8,7 +8,8 @@ import requests
 BOT_TOKEN = "8681012084:AAFJMsY1cFROKLKADDOvAPNd88cunYhSci8"
 CHANNEL_CHAT_ID = "-1003580840383"
 
-GOLD_URL = "https://stooq.com/q/l/?s=xauusd"
+GOLD_URL = "https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X"
+GOLD_URL_FALLBACK = "https://query2.finance.yahoo.com/v8/finance/chart/XAUUSD=X"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
 IMPORT_DUTY = 5
@@ -39,12 +40,19 @@ def save_state(state):
 
 def get_gold_price():
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(GOLD_URL, headers=headers, timeout=20)
-    r.raise_for_status()
-    match = re.search(r"\d+\.\d+", r.text)
-    if not match:
-        raise ValueError("Gold price not found")
-    return float(match.group())
+    last_err = None
+    for url in (GOLD_URL, GOLD_URL_FALLBACK):
+        try:
+            r = requests.get(url, headers=headers, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+            result = data["chart"]["result"][0]
+            price = result["meta"]["regularMarketPrice"]
+            return float(price)
+        except Exception as e:
+            last_err = e
+            continue
+    raise ValueError(f"Gold price not found: {last_err}")
 
 
 def get_usdinr():
