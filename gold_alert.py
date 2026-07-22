@@ -7,8 +7,8 @@ import requests
 BOT_TOKEN = "8681012084:AAFJMsY1cFROKLKADDOvAPNd88cunYhSci8"
 CHANNEL_CHAT_ID = "-1003580840383"
 
-# ✅ New Reliable Free Gold API (No Key Required)
-GOLD_URL = "https://data-asg.goldprice.org/dbXRates/USD"
+# ✅ 100% Free, Bot-Friendly and Fast API (No Key Required)
+GOLD_URL = "https://api.gold-api.com/price/XAU"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
 IMPORT_DUTY = 5
@@ -39,17 +39,17 @@ def save_state(state):
 
 def get_gold_price():
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "GoldAlertBot/1.0"
     }
     r = requests.get(GOLD_URL, headers=headers, timeout=20)
     r.raise_for_status()
     data = r.json()
     
-    # GoldPrice API से लाइव USD XAU (Gold) प्राइस निकालना
-    if "items" in data and len(data["items"]) > 0:
-        return float(data["items"][0]["xauPrice"])
+    # Gold-API सीधा JSON में "price" फील्ड देता है
+    if "price" in data:
+        return float(data["price"])
     else:
-        raise ValueError("Gold price not found in JSON response")
+        raise ValueError("Gold price field 'price' not found in JSON response")
 
 
 def get_usdinr():
@@ -78,42 +78,4 @@ def get_rates():
 def send_telegram(msg):
     payload = {
         "chat_id": CHANNEL_CHAT_ID,
-        "text": msg
-    }
-    r = requests.post(SEND_MESSAGE_URL, data=payload, timeout=20)
-    print("Status:", r.status_code)
-    print("Response:", r.text)
-    r.raise_for_status()
-
-
-def build_message(price_24k, price_22k, usd_gold, usd_inr):
-    return f"""Gold Alert India 🇮🇳
-
-24K: ₹{price_24k:,} / 10g
-22K: ₹{price_22k:,} / 10g
-USD Gold: ${usd_gold:.2f} / ounce
-USDINR: {usd_inr:.2f}
-"""
-
-
-def handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr):
-    current_hour = int(time.time() // 3600)
-    # हर 2 घंटे में 1 बार
-    if current_hour % 2 == 0 and state.get("last_auto_alert_hour") != current_hour:
-        msg = build_message(price_24k, price_22k, usd_gold, usd_inr)
-        send_telegram(msg)
-        state["last_auto_alert_hour"] = current_hour
-    return state
-
-
-def main():
-    # 🔥 Delete webhook to prevent issues
-    requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
-    state = load_state()
-    price_24k, price_22k, usd_gold, usd_inr = get_rates()
-    state = handle_auto_alert(state, price_24k, price_22k, usd_gold, usd_inr)
-    save_state(state)
-
-
-if __name__ == "__main__":
-    main()
+  
